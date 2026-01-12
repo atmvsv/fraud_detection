@@ -21,3 +21,4 @@ catboost_info/
 models/
 *.pkl
 *.joblib
+.DS_Store
