@@ -16,6 +16,7 @@ data/
 *.csv
 *.zip
 
+catboost_info/
 .ipynb_checkpoints/
 models/
 *.pkl
