@@ -1,0 +1,164 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  repository-checks:
+    name: Repository checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Check committed whitespace
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            git diff --check "$BASE_SHA" "$HEAD_SHA"
+          elif [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
+            git show --check --format= "$CURRENT_SHA"
+          else
+            git diff --check "$BEFORE_SHA" "$CURRENT_SHA"
+          fi
+
+      - name: Validate notebooks as JSON
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          paths = sorted(Path("notebooks").glob("*.ipynb"))
+          if not paths:
+              raise SystemExit("no notebooks found")
+          for path in paths:
+              json.loads(path.read_text(encoding="utf-8"))
+          print(f"validated {len(paths)} notebooks")
+          PY
+
+      - name: Validate generated-artifact boundaries
+        run: |
+          python3 - <<'PY'
+          import fnmatch
+          import subprocess
+
+          tracked = subprocess.check_output(
+              ["git", "ls-files"], text=True
+          ).splitlines()
+          forbidden_patterns = (
+              "data/creditcard.csv",
+              "data/*.zip",
+              "data/*.feather",
+              "catboost_info/*",
+              "*/catboost_info/*",
+              "models/*",
+              "*.pkl",
+              "*.joblib",
+              "*.cbm",
+              ".ipynb_checkpoints/*",
+              "*/.ipynb_checkpoints/*",
+              ".DS_Store",
+              "*/.DS_Store",
+          )
+          violations = sorted(
+              path
+              for path in tracked
+              if any(fnmatch.fnmatch(path, pattern) for pattern in forbidden_patterns)
+          )
+          if violations:
+              raise SystemExit(
+                  "generated or local artifacts are tracked: " + ", ".join(violations)
+              )
+
+          ignored_examples = (
+              "data/creditcard.csv",
+              "data/X_train.feather",
+              "notebooks/catboost_info/training.json",
+              "models/model.cbm",
+              "notebooks/.ipynb_checkpoints/example.ipynb",
+              ".DS_Store",
+          )
+          missing = []
+          for path in ignored_examples:
+              result = subprocess.run(
+                  ["git", "check-ignore", "--quiet", "--no-index", path],
+                  check=False,
+              )
+              if result.returncode != 0:
+                  missing.append(path)
+          if missing:
+              raise SystemExit(
+                  "expected generated paths are not ignored: " + ", ".join(missing)
+              )
+          print("generated-artifact boundaries are valid")
+          PY
+
+      - name: Validate changed environment portability
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            if git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- environment.yml; then
+              echo "environment.yml is unchanged; skipping portability validation"
+              exit 0
+            fi
+          elif [[ ! "$BEFORE_SHA" =~ ^0+$ ]] \
+            && git diff --quiet "$BEFORE_SHA" "$CURRENT_SHA" -- environment.yml; then
+            echo "environment.yml is unchanged; skipping portability validation"
+            exit 0
+          fi
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path("environment.yml").read_text(encoding="utf-8")
+          required_sections = ("name:", "channels:", "dependencies:")
+          missing = [section for section in required_sections if section not in text]
+          if missing:
+              raise SystemExit(
+                  "environment.yml is missing required sections: " + ", ".join(missing)
+              )
+
+          forbidden = {
+              "local Conda prefix": r"(?mi)^\s*prefix\s*:",
+              "file URL dependency": r"(?i)file://",
+              "Unix home path": r"(?i)(?:^|[\s:=\"'])(?:/Users/|/home/)",
+              "Windows absolute path": r"(?i)(?:^|[\s:=\"'])[a-z]:\\",
+          }
+          violations = [
+              label for label, pattern in forbidden.items() if re.search(pattern, text)
+          ]
+          if violations:
+              raise SystemExit(
+                  "environment.yml contains non-portable values: "
+                  + ", ".join(violations)
+              )
+          print("environment.yml passes portability checks")
+          PY
