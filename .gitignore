@@ -12,13 +12,25 @@ venv/
 .vscode/
 *.swp
 
-data/
-*.csv
-*.zip
+# Downloaded source data (see README)
+/data/creditcard.csv
+/data/*.zip
 
+# Reproducible outputs created by notebooks/01_EDA.ipynb
+/data/X_train.feather
+/data/X_test.feather
+/data/y_train.feather
+/data/y_test.feather
+
+# Generated training and model artifacts
 catboost_info/
-.ipynb_checkpoints/
+*.log
 models/
 *.pkl
 *.joblib
+*.cbm
+
+# Notebook and operating-system metadata
+.ipynb_checkpoints/
 .DS_Store
+Thumbs.db
