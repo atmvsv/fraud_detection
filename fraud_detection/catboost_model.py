@@ -1,9 +1,9 @@
 """CatBoost benchmark model with leakage-safe fitting boundaries."""
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
-from catboost import CatBoostClassifier
 
 from .baselines import BaselineEvaluation, evaluate_baseline
 
@@ -18,7 +18,7 @@ DEFAULT_EARLY_STOPPING_ROUNDS = 50
 class CatBoostFraudModel:
     """A fitted CatBoost model that ranks more suspicious transactions higher."""
 
-    estimator: CatBoostClassifier
+    estimator: Any
 
     def fraud_scores(self, features) -> np.ndarray:
         """Return the fitted probability of fraud class ``1``."""
@@ -39,7 +39,8 @@ def fit_catboost_model(
 ) -> CatBoostFraudModel:
     """Fit CatBoost with train-only imbalance state and validation early stopping."""
     scale_pos_weight = _training_scale_pos_weight(training_labels)
-    estimator = CatBoostClassifier(
+    classifier_type = _catboost_classifier_type()
+    estimator = classifier_type(
         iterations=DEFAULT_CATBOOST_ITERATIONS,
         depth=DEFAULT_CATBOOST_DEPTH,
         learning_rate=DEFAULT_CATBOOST_LEARNING_RATE,
@@ -76,6 +77,13 @@ def evaluate_catboost_model(
         test_labels,
         recall_target=recall_target,
     )
+
+
+def _catboost_classifier_type():
+    """Import CatBoost only when its model path is fitted."""
+    from catboost import CatBoostClassifier
+
+    return CatBoostClassifier
 
 
 def _training_scale_pos_weight(training_labels) -> float:

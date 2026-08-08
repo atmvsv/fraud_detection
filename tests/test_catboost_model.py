@@ -8,22 +8,33 @@ from fraud_detection.catboost_model import (
     DEFAULT_CATBOOST_ITERATIONS,
     DEFAULT_CATBOOST_LEARNING_RATE,
     DEFAULT_EARLY_STOPPING_ROUNDS,
+    CatBoostFraudModel,
     evaluate_catboost_model,
     fit_catboost_model,
 )
 
 
+class FakeProbabilityEstimator:
+    classes_ = np.array([0, 1])
+
+    def predict_proba(self, features):
+        values = np.asarray(features, dtype=float)[:, 0]
+        fraud_probabilities = 1.0 / (1.0 + np.exp(-values))
+        return np.column_stack((1.0 - fraud_probabilities, fraud_probabilities))
+
+
 class CatBoostModelTests(unittest.TestCase):
-    @patch("fraud_detection.catboost_model.CatBoostClassifier")
+    @patch("fraud_detection.catboost_model._catboost_classifier_type")
     def test_fit_uses_train_only_imbalance_and_validation_early_stopping(
         self,
-        classifier_type,
+        classifier_factory,
     ):
         training_features = np.arange(8, dtype=float).reshape(-1, 1)
         training_labels = np.array([0, 0, 0, 0, 0, 0, 1, 1])
         validation_features = np.arange(4, dtype=float).reshape(-1, 1)
         validation_labels = np.array([0, 1, 1, 1])
 
+        classifier_type = classifier_factory.return_value
         model = fit_catboost_model(
             training_features,
             training_labels,
@@ -31,6 +42,7 @@ class CatBoostModelTests(unittest.TestCase):
             validation_labels,
         )
 
+        classifier_factory.assert_called_once_with()
         classifier_type.assert_called_once_with(
             iterations=DEFAULT_CATBOOST_ITERATIONS,
             depth=DEFAULT_CATBOOST_DEPTH,
@@ -72,12 +84,7 @@ class CatBoostModelTests(unittest.TestCase):
         )
         validation_labels = np.array([0, 0, 1, 1])
 
-        model = fit_catboost_model(
-            training_features,
-            training_labels,
-            validation_features,
-            validation_labels,
-        )
+        model = CatBoostFraudModel(estimator=FakeProbabilityEstimator())
         scores = model.fraud_scores(validation_features)
 
         self.assertGreater(
@@ -94,12 +101,7 @@ class CatBoostModelTests(unittest.TestCase):
         validation_labels = np.array([0, 0, 1, 1])
         test_features = np.array([[-2.5], [-1.5], [1.5], [2.5]])
         test_labels = np.array([0, 0, 1, 1])
-        model = fit_catboost_model(
-            training_features,
-            training_labels,
-            validation_features,
-            validation_labels,
-        )
+        model = CatBoostFraudModel(estimator=FakeProbabilityEstimator())
 
         evaluation = evaluate_catboost_model(
             model,
