@@ -28,6 +28,7 @@ A machine learning project to detect fraudulent credit card transactions using a
 │   ├── transactions.py           # transaction loading and schema validation
 │   ├── splits.py                 # deterministic stratified benchmark splits
 │   ├── preprocessing.py          # train-fitted Amount preprocessing
+│   ├── baselines.py              # Logistic Regression and Isolation Forest baselines
 │   └── evaluation.py             # validation-selected review thresholds and reports
 ├── tests/                         # fast synthetic unit tests
 ├── notebooks/
@@ -111,7 +112,13 @@ The initial benchmark uses a configurable validation recall target of `0.90` as 
 
 The selected validation threshold is then frozen and applied unchanged to test fraud scores. Test labels must not be used to adjust the threshold, because the test split is reserved for one-time independent evaluation.
 
-Reports include average precision as PR-AUC, ROC-AUC as secondary ranking context, and the threshold-dependent recall, precision, false positive count, false negative count, false positive rate, and fraud review queue size. Model training, model selection, and business cost optimization remain outside this protocol.
+Reports include average precision as PR-AUC, ROC-AUC as secondary ranking context, and the threshold-dependent recall, precision, false positive count, false negative count, false positive rate, and fraud review queue size.
+
+## Baseline Model Protocol
+
+The reusable baseline module fits both models on the training split only. Logistic Regression is a supervised class-weighted baseline and returns the fitted probability of fraud class `1`. Isolation Forest is fitted without labels and negates `score_samples`, whose native direction assigns larger values to more normal observations. Both paths therefore expose fraud scores with the same higher-is-more-fraudulent direction.
+
+Validation fraud scores select the review threshold through the shared evaluation module. That exact threshold is then applied unchanged to test fraud scores. The baseline configuration preserves the initial benchmark defaults: random seed `42`, Logistic Regression `max_iter=1000`, and Isolation Forest with `100` estimators and `contamination=0.01`. Hyperparameter tuning, model selection, and business cost optimization remain outside this protocol.
 
 ## Performance
 
