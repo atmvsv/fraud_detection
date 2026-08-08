@@ -51,16 +51,19 @@ def select_review_threshold(
     label_values, score_values = _validated_inputs(labels, fraud_scores)
     positive_count = int(label_values.sum())
 
-    selected_threshold = None
-    for threshold in np.unique(score_values)[::-1]:
-        reviewed = score_values >= threshold
-        recall = float(label_values[reviewed].sum() / positive_count)
-        if recall >= recall_target:
-            selected_threshold = float(threshold)
-            break
+    descending_order = np.argsort(-score_values, kind="stable")
+    sorted_scores = score_values[descending_order]
+    sorted_labels = label_values[descending_order]
+    cumulative_positives = np.cumsum(sorted_labels)
+    score_group_ends = np.r_[sorted_scores[1:] != sorted_scores[:-1], True]
+    valid_group_ends = np.flatnonzero(
+        score_group_ends
+        & (cumulative_positives / positive_count >= recall_target)
+    )
 
-    if selected_threshold is None:
+    if valid_group_ends.size == 0:
         raise ValueError("No validation threshold satisfies recall_target.")
+    selected_threshold = float(sorted_scores[valid_group_ends[0]])
 
     report = report_fraud_scores(
         label_values,

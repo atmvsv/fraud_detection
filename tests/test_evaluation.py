@@ -38,6 +38,17 @@ class FraudScoreEvaluationTests(unittest.TestCase):
         self.assertEqual(0, selection.validation_report.false_positive_count)
         self.assertEqual(0.0, selection.validation_report.false_positive_rate)
 
+    def test_score_ties_are_kept_in_the_same_review_group(self):
+        selection = select_review_threshold(
+            [1, 0, 1, 0],
+            [0.90, 0.90, 0.80, 0.10],
+            recall_target=0.50,
+        )
+
+        self.assertEqual(0.90, selection.threshold)
+        self.assertEqual(2, selection.validation_report.review_queue_size)
+        self.assertEqual(1, selection.validation_report.false_positive_count)
+
     def test_applies_validation_selected_threshold_unchanged_to_test_scores(self):
         selection = select_review_threshold(
             [1, 0, 1, 0],
