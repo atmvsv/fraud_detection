@@ -27,7 +27,8 @@ A machine learning project to detect fraudulent credit card transactions using a
 ├── fraud_detection/
 │   ├── transactions.py           # transaction loading and schema validation
 │   ├── splits.py                 # deterministic stratified benchmark splits
-│   └── preprocessing.py          # train-fitted Amount preprocessing
+│   ├── preprocessing.py          # train-fitted Amount preprocessing
+│   └── evaluation.py             # validation-selected review thresholds and reports
 ├── tests/                         # fast synthetic unit tests
 ├── notebooks/
 │   ├── 01_EDA.ipynb              # exploration, preprocessing, and train/test split
@@ -103,6 +104,14 @@ Reusable preprocessing is fitted only on the training transactions. It stores th
 The current benchmark deliberately drops `Time` rather than fitting or deriving a time feature. This preserves the existing modeling boundary while making the choice explicit. A future modeling task may evaluate a documented time transformation without changing the leakage rule: any learned preprocessing state must still be fitted on training transactions only.
 
 The transformed feature table contains `V1` through `V28` plus `scaled_Amount`. Labels remain separate from preprocessing output.
+
+## Review Threshold Protocol
+
+The initial benchmark uses a configurable validation recall target of `0.90` as an explicit educational operating-policy assumption, not as a universally optimal or cost-optimal threshold. Review-threshold selection considers observed validation fraud scores and chooses the highest cutoff that satisfies the recall target. This also avoids unnecessarily expanding the review queue or false positive rate when recall is unchanged across adjacent cutoffs.
+
+The selected validation threshold is then frozen and applied unchanged to test fraud scores. Test labels must not be used to adjust the threshold, because the test split is reserved for one-time independent evaluation.
+
+Reports include average precision as PR-AUC, ROC-AUC as secondary ranking context, and the threshold-dependent recall, precision, false positive count, false negative count, false positive rate, and fraud review queue size. Model training, model selection, and business cost optimization remain outside this protocol.
 
 ## Performance
 
