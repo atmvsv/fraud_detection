@@ -8,6 +8,11 @@ from .baselines import (
     fit_isolation_forest_baseline,
     fit_logistic_regression_baseline,
 )
+from .catboost_model import (
+    CatBoostFraudModel,
+    evaluate_catboost_model,
+    fit_catboost_model,
+)
 from .evaluation import (
     FraudScoreReport,
     ReviewThresholdSelection,
@@ -20,6 +25,7 @@ from .transactions import TransactionDataError, load_transactions
 
 __all__ = [
     "BaselineEvaluation",
+    "CatBoostFraudModel",
     "FraudScoreReport",
     "IsolationForestBaseline",
     "LogisticRegressionBaseline",
@@ -29,6 +35,8 @@ __all__ = [
     "TransactionSplits",
     "create_stratified_splits",
     "evaluate_baseline",
+    "evaluate_catboost_model",
+    "fit_catboost_model",
     "fit_isolation_forest_baseline",
     "fit_logistic_regression_baseline",
     "fit_transaction_preprocessor",

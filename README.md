@@ -29,6 +29,7 @@ A machine learning project to detect fraudulent credit card transactions using a
 │   ├── splits.py                 # deterministic stratified benchmark splits
 │   ├── preprocessing.py          # train-fitted Amount preprocessing
 │   ├── baselines.py              # Logistic Regression and Isolation Forest baselines
+│   ├── catboost_model.py         # leakage-safe CatBoost benchmark training
 │   └── evaluation.py             # validation-selected review thresholds and reports
 ├── tests/                         # fast synthetic unit tests
 ├── notebooks/
@@ -119,6 +120,14 @@ Reports include average precision as PR-AUC, ROC-AUC as secondary ranking contex
 The reusable baseline module fits both models on the training split only. Logistic Regression is a supervised class-weighted baseline and returns the fitted probability of fraud class `1`. Isolation Forest is fitted without labels and negates `score_samples`, whose native direction assigns larger values to more normal observations. Both paths therefore expose fraud scores with the same higher-is-more-fraudulent direction.
 
 Validation fraud scores select the review threshold through the shared evaluation module. That exact threshold is then applied unchanged to test fraud scores. The baseline configuration preserves the initial benchmark defaults: random seed `42`, Logistic Regression `max_iter=1000`, and Isolation Forest with `100` estimators and `contamination=0.01`. Hyperparameter tuning, model selection, and business cost optimization remain outside this protocol.
+
+## CatBoost Model Protocol
+
+The reusable CatBoost path computes `scale_pos_weight` explicitly as the number of non-fraud training labels divided by the number of fraud training labels. Only the labels supplied for model fitting contribute to this value. Validation labels do not affect class weighting, and test data is absent from the fitting interface.
+
+Validation transactions are passed to CatBoost only as the early-stopping evaluation set. The fitted model returns the probability of fraud class `1`, preserving the shared higher-is-more-fraudulent score direction. Validation scores then select the review threshold through the same evaluation module used by the baselines, and the frozen threshold is applied unchanged to test scores.
+
+The CatBoost configuration intentionally preserves the initial benchmark choices: `iterations=2000`, `depth=6`, `learning_rate=0.05`, `early_stopping_rounds=50`, and random seed `42`. Training-file output is disabled so automated checks do not create local CatBoost artifacts. These are reproducibility defaults for the benchmark rather than results of a new hyperparameter search or claims of optimality.
 
 ## Performance
 
